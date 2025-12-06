@@ -13,11 +13,11 @@
         /* 全局样式：科技黑风格 */
         body { margin: 0; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #111; color: #eee; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         
-        h2 { margin: 10px 0; font-size: 1.1rem; font-weight: 300; letter-spacing: 1px; color: #88c0d0; }
+        h2 { margin: 5px 0; font-size: 1.1rem; font-weight: 300; letter-spacing: 1px; color: #88c0d0; }
 
         /* 视频容器 */
         #container { 
-            position: relative; width: 95%; max-width: 480px; height: 55vh; 
+            position: relative; width: 95%; max-width: 480px; height: 35vh; 
             background: #000; border-radius: 12px; overflow: hidden; 
             box-shadow: 0 0 20px rgba(0, 255, 255, 0.1); 
             border: 1px solid #333;
@@ -35,8 +35,8 @@
 
         /* 状态显示区 */
         #status-bar {
-            margin-top: 15px; width: 90%; max-width: 450px;
-            padding: 10px 15px; border-radius: 8px; background: #222; 
+            margin-top: 10px; width: 90%; max-width: 450px;
+            padding: 8px 15px; border-radius: 8px; background: #222; 
             display: flex; justify-content: space-between; align-items: center;
             border-left: 5px solid #444; transition: all 0.3s;
         }
@@ -51,8 +51,8 @@
 
         /* 控制面板 */
         #controls {
-            margin-top: 15px; width: 90%; max-width: 450px;
-            background: #1a1a1a; padding: 15px; border-radius: 8px;
+            margin-top: 10px; width: 90%; max-width: 450px;
+            background: #1a1a1a; padding: 10px; border-radius: 8px;
             font-size: 0.9rem;
         }
         
@@ -110,7 +110,7 @@
     <!-- 设置面板 -->
     <div id="controls">
         <div class="control-group">
-            <label>⏱️ 久坐提醒 (分钟)</label>
+            <label>⏱️ 静止提醒 (分钟)</label>
             <!-- 默认 5 分钟，步进 0.1 分钟（方便测试，输入 0.2 就是 12秒） -->
             <input type="number" id="timeInput" value="5" step="0.1" min="0.1" onchange="updateSettings()">
         </div>
@@ -134,7 +134,7 @@
             </div>
         </div>
         <div class="control-group">
-            <label>🌊 久坐重置幅度</label>
+            <label>🌊 活跃判定幅度</label>
             <div style="display:flex; align-items:center; gap:10px;">
                 <input type="range" id="senseInput" min="0.01" max="0.15" step="0.01" value="0.08" oninput="updateSettings()">
                 <span id="senseValue" style="color:#888; font-size:0.8rem; width:30px;">0.08</span>
@@ -179,7 +179,7 @@
     const tiltValue = document.getElementById('tiltValue');
 
     // 动态配置变量
-    let ALERT_THRESHOLD_SECONDS = 5 * 60; // 久坐阈值
+    let ALERT_THRESHOLD_SECONDS = 5 * 60; // 静止阈值
     let POSTURE_THRESHOLD_SECONDS = 5;    // 不良姿态持续阈值
     let MOVEMENT_THRESHOLD = 0.08;
     let LOW_HEAD_THRESHOLD = 0.05;
@@ -188,7 +188,7 @@
     // 状态变量
     let lastMoveTime = Date.now();
     let prevNose = null;
-    let isAlerting = false; // 久坐报警
+    let isAlerting = false; // 静止报警
     let isPostureAlerting = false; // 姿态报警
     
     // 姿态检测相关
@@ -360,7 +360,7 @@
                 overlayMsg.style.display = "none";
             }
 
-            // 处理久坐计时 (只有在姿态正常时才优先显示久坐状态，避免冲突)
+            // 处理静止计时 (只有在姿态正常时才优先显示静止状态，避免冲突)
             if (!isPostureAlerting) {
                 const idleSeconds = (now - lastMoveTime) / 1000;
                 const timeLeft = Math.max(0, Math.ceil(ALERT_THRESHOLD_SECONDS - idleSeconds));
@@ -368,8 +368,8 @@
                 if (idleSeconds > ALERT_THRESHOLD_SECONDS) {
                     isAlerting = true;
                     updateUI("alert");
-                    timerDisplay.innerText = "⚠️ 该活动了";
-                    msgDisplay.innerText = "久坐提醒";
+                    timerDisplay.innerText = "⚠️ 身体僵硬警告";
+                    msgDisplay.innerText = "长时间静止";
                     playBeep('normal');
                 } else {
                     // 正常倒计时
