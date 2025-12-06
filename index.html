@@ -26,6 +26,13 @@
         video { position: absolute; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); opacity: 0.8; }
         canvas { position: absolute; width: 100%; height: 100%; transform: scaleX(-1); }
         
+        /* 提示覆盖层 */
+        #overlay-msg {
+            position: absolute; top: 10px; left: 0; width: 100%; text-align: center;
+            color: #ff5555; font-weight: bold; font-size: 1.2rem; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none; display: none;
+        }
+
         /* 状态显示区 */
         #status-bar {
             margin-top: 15px; width: 90%; max-width: 450px;
@@ -63,15 +70,19 @@
         input[type="range"] { -webkit-appearance: none; width: 120px; height: 4px; background: #444; border-radius: 2px; outline: none; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #88c0d0; border-radius: 50%; cursor: pointer; }
 
-        /* 启动按钮 */
-        #startBtn { 
-            margin: 20px; padding: 12px 40px; font-size: 16px; 
-            background: linear-gradient(45deg, #1976D2, #64B5F6); 
-            color: white; border: none; border-radius: 30px; 
-            box-shadow: 0 4px 10px rgba(25, 118, 210, 0.4);
-            cursor: pointer; letter-spacing: 1px;
+        /* 按钮组 */
+        .btn-group { display: flex; gap: 10px; justify-content: center; margin: 20px; }
+
+        /* 通用按钮 */
+        .btn {
+            padding: 12px 25px; font-size: 15px; border: none; border-radius: 30px; 
+            cursor: pointer; letter-spacing: 1px; color: white; transition: transform 0.1s;
         }
-        #startBtn:active { transform: scale(0.95); }
+        .btn:active { transform: scale(0.95); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        #startBtn { background: linear-gradient(45deg, #1976D2, #64B5F6); box-shadow: 0 4px 10px rgba(25, 118, 210, 0.4); }
+        #calibBtn { background: linear-gradient(45deg, #009688, #4DB6AC); box-shadow: 0 4px 10px rgba(0, 150, 136, 0.4); display: none; }
 
     </style>
 </head>
@@ -82,6 +93,7 @@
     <div id="container">
         <video id="input_video" playsinline></video>
         <canvas id="output_canvas"></canvas>
+        <div id="overlay-msg"></div>
     </div>
 
     <!-- 状态条 -->
@@ -98,23 +110,45 @@
     <!-- 设置面板 -->
     <div id="controls">
         <div class="control-group">
-            <label>⏱️ 提醒时间 (分钟)</label>
-            <!-- 默认 20 分钟，步进 0.1 分钟（方便测试，输入 0.2 就是 12秒） -->
-            <input type="number" id="timeInput" value="20" step="0.1" min="0.1" onchange="updateSettings()">
+            <label>⏱️ 久坐提醒 (分钟)</label>
+            <!-- 默认 5 分钟，步进 0.1 分钟（方便测试，输入 0.2 就是 12秒） -->
+            <input type="number" id="timeInput" value="5" step="0.1" min="0.1" onchange="updateSettings()">
         </div>
         <div class="control-group">
-            <label>🌊 灵敏度 (越小越灵)</label>
+            <label>🐢 防低头/歪头 (秒)</label>
+            <!-- 持续不良姿态多少秒后报警 -->
+            <input type="number" id="postureTimeInput" value="5" step="1" min="1" onchange="updateSettings()">
+        </div>
+        <div class="control-group">
+            <label>📏 低头容忍度</label>
             <div style="display:flex; align-items:center; gap:10px;">
-                <input type="range" id="senseInput" min="0.01" max="0.15" step="0.01" value="0.05" oninput="updateSettings()">
-                <span id="senseValue" style="color:#888; font-size:0.8rem; width:30px;">0.05</span>
+                <input type="range" id="lowHeadInput" min="0.02" max="0.15" step="0.01" value="0.05" oninput="updateSettings()">
+                <span id="lowHeadValue" style="color:#888; font-size:0.8rem; width:30px;">0.05</span>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>📐 歪头容忍度</label>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="range" id="tiltInput" min="0.1" max="0.6" step="0.05" value="0.2" oninput="updateSettings()">
+                <span id="tiltValue" style="color:#888; font-size:0.8rem; width:30px;">0.2</span>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>🌊 久坐重置幅度</label>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="range" id="senseInput" min="0.01" max="0.15" step="0.01" value="0.08" oninput="updateSettings()">
+                <span id="senseValue" style="color:#888; font-size:0.8rem; width:30px;">0.08</span>
             </div>
         </div>
         <div style="margin-top:5px; font-size:0.75rem; color:#666;">
-            * 测试技巧：将时间设为 0.2 (即12秒) 即可快速预览效果
+            * 启动后请先保持标准坐姿，点击“校准”
         </div>
     </div>
     
-    <button id="startBtn" onclick="startApp()">启动摄像头</button>
+    <div class="btn-group">
+        <button id="startBtn" class="btn" onclick="startApp()">启动摄像头</button>
+        <button id="calibBtn" class="btn" onclick="calibrate()">🎯 校准标准坐姿</button>
+    </div>
 
     <div style="margin-top: 20px; font-size: 0.8rem; opacity: 0.6;">
         <a href="https://github.com/xingye1673/NeckGuard" target="_blank" style="color: #88c0d0; text-decoration: none; border-bottom: 1px dashed #88c0d0;">
@@ -131,19 +165,37 @@
     const msgDisplay = document.getElementById('msg-display');
     const statusIcon = document.getElementById('status-icon');
     const startBtn = document.getElementById('startBtn');
+    const calibBtn = document.getElementById('calibBtn');
+    const overlayMsg = document.getElementById('overlay-msg');
     
     // 输入控件
     const timeInput = document.getElementById('timeInput');
+    const postureTimeInput = document.getElementById('postureTimeInput');
     const senseInput = document.getElementById('senseInput');
     const senseValue = document.getElementById('senseValue');
+    const lowHeadInput = document.getElementById('lowHeadInput');
+    const lowHeadValue = document.getElementById('lowHeadValue');
+    const tiltInput = document.getElementById('tiltInput');
+    const tiltValue = document.getElementById('tiltValue');
 
     // 动态配置变量
-    let ALERT_THRESHOLD_SECONDS = 20 * 60; // 默认20分钟
-    let MOVEMENT_THRESHOLD = 0.05;
+    let ALERT_THRESHOLD_SECONDS = 5 * 60; // 久坐阈值
+    let POSTURE_THRESHOLD_SECONDS = 5;    // 不良姿态持续阈值
+    let MOVEMENT_THRESHOLD = 0.08;
+    let LOW_HEAD_THRESHOLD = 0.05;
+    let TILT_THRESHOLD = 0.2;
 
+    // 状态变量
     let lastMoveTime = Date.now();
     let prevNose = null;
-    let isAlerting = false;
+    let isAlerting = false; // 久坐报警
+    let isPostureAlerting = false; // 姿态报警
+    
+    // 姿态检测相关
+    let isCalibrated = false;
+    let standardPose = { noseY: 0, eyeAngle: 0 };
+    let badPostureStartTime = 0; // 不良姿态开始时间
+
     let camera = null;
     let pose = null;
     let audioCtx = null;
@@ -156,19 +208,46 @@
         if(mins <= 0) mins = 0.1;
         ALERT_THRESHOLD_SECONDS = mins * 60;
         
+        // 读取不良姿态秒数
+        let pSecs = parseFloat(postureTimeInput.value);
+        if(pSecs < 1) pSecs = 1;
+        POSTURE_THRESHOLD_SECONDS = pSecs;
+
         // 读取灵敏度
         MOVEMENT_THRESHOLD = parseFloat(senseInput.value);
         senseValue.innerText = MOVEMENT_THRESHOLD;
+
+        // 读取姿态阈值
+        LOW_HEAD_THRESHOLD = parseFloat(lowHeadInput.value);
+        lowHeadValue.innerText = LOW_HEAD_THRESHOLD;
         
-        // 如果正在运行，不重置计时，只改变阈值
-        console.log(`Settings Updated: Alert=${ALERT_THRESHOLD_SECONDS}s, Sense=${MOVEMENT_THRESHOLD}`);
+        TILT_THRESHOLD = parseFloat(tiltInput.value);
+        tiltValue.innerText = TILT_THRESHOLD;
+        
+        console.log(`Settings: Sedentary=${ALERT_THRESHOLD_SECONDS}s, Posture=${POSTURE_THRESHOLD_SECONDS}s, Sense=${MOVEMENT_THRESHOLD}, LowHead=${LOW_HEAD_THRESHOLD}, Tilt=${TILT_THRESHOLD}`);
+    }
+
+    // 校准功能
+    function calibrate() {
+        if (!prevNose) {
+            alert("未检测到人脸，请正对摄像头");
+            return;
+        }
+        // 简单的校准：记录当前鼻子的Y坐标（归一化 0-1，越往下越大）
+        // 记录双眼连线角度
+        standardPose.noseY = prevNose.y;
+        standardPose.eyeAngle = prevNose.angle || 0; // 这里简化，实际在onResults里算
+        
+        isCalibrated = true;
+        alert("✅ 校准成功！\n系统已记住您的标准坐姿。\n\n现在尝试低头或歪头，系统将进行监测。");
+        calibBtn.innerText = "🎯 重新校准";
     }
 
     // 蜂鸣器逻辑
-    function playBeep() {
+    function playBeep(type = 'normal') {
         const now = Date.now();
         if (now < nextBeepTime) return;
-        nextBeepTime = now + 1000; 
+        nextBeepTime = now + (type === 'urgent' ? 500 : 1000); 
 
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -180,7 +259,8 @@
         gainNode.connect(audioCtx.destination);
 
         oscillator.type = 'square'; 
-        oscillator.frequency.value = 600; // 稍微低沉一点的提示音
+        // 紧急报警（姿态）频率高一点，普通报警（久坐）低一点
+        oscillator.frequency.value = type === 'urgent' ? 800 : 600; 
         
         gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
@@ -193,63 +273,113 @@
         canvasCtx.save();
         canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
         
+        let currentPostureStatus = "OK"; // OK, LOW_HEAD, TILT
+
         if (results.poseLandmarks) {
-            // === 美化后的绘制逻辑 ===
-            // 1. 绘制极细的连线 (青色, 1px)
+            // === 绘制逻辑 ===
             drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
                          {color: 'rgba(0, 255, 255, 0.6)', lineWidth: 1});
-            
-            // 2. 绘制极小的关键点 (白色, 半径1px)
-            // 并不是所有33个点都画，只画上半身关键点会更清爽，这里简单起见还是画全部，但缩小
             drawLandmarks(canvasCtx, results.poseLandmarks,
                         {color: 'rgba(255, 255, 255, 0.8)', lineWidth: 0, radius: 1});
             
-            // 特别标记鼻子 (用来提示监测点)
             const nose = results.poseLandmarks[0];
+            const leftEar = results.poseLandmarks[7];
+            const rightEar = results.poseLandmarks[8];
+
+            // 绘制鼻子标记
             canvasCtx.beginPath();
-            canvasCtx.arc(nose.x * canvasElement.width, nose.y * canvasElement.height, 3, 0, 2 * Math.PI);
-            canvasCtx.fillStyle = '#00FFFF';
+            canvasCtx.arc(nose.x * canvasElement.width, nose.y * canvasElement.height, 5, 0, 2 * Math.PI);
+            canvasCtx.fillStyle = isCalibrated ? '#00FF00' : '#FFFF00'; // 校准后变绿
             canvasCtx.fill();
-        }
 
-        // 逻辑判断
-        if (results.poseLandmarks) {
-            const nose = results.poseLandmarks[0];
+            // === 1. 姿态检测逻辑 (基于校准) ===
+            if (isCalibrated) {
+                // A. 防低头检测
+                // 逻辑：如果当前鼻子Y坐标 比 标准Y坐标 大（屏幕坐标系向下为大），且超过一定阈值
+                const dropDiff = nose.y - standardPose.noseY;
+                if (dropDiff > LOW_HEAD_THRESHOLD) { 
+                    currentPostureStatus = "LOW_HEAD";
+                }
+
+                // B. 防歪头检测 (计算双耳连线角度)
+                const dx = rightEar.x - leftEar.x;
+                const dy = rightEar.y - leftEar.y;
+                
+                // 只要 dy/dx 的斜率过大就是歪头。
+                if (Math.abs(dy / dx) > TILT_THRESHOLD) { 
+                    currentPostureStatus = "TILT";
+                }
+            }
+
+            // === 2. 久坐/活跃检测逻辑 ===
             const now = Date.now();
-
             if (!prevNose) {
                 prevNose = nose;
                 lastMoveTime = now;
             }
-
             const dist = Math.sqrt(Math.pow(nose.x - prevNose.x, 2) + Math.pow(nose.y - prevNose.y, 2));
-
-            // 使用动态读取的灵敏度
             if (dist > MOVEMENT_THRESHOLD) {
                 lastMoveTime = now;
                 prevNose = nose;
-                isAlerting = false;
-                updateUI("active");
-            } else {
-                updateUI("static");
+                isAlerting = false; // 只要动了，久坐报警解除
             }
 
-            const idleSeconds = (now - lastMoveTime) / 1000;
-            // 使用动态读取的时间阈值
-            const timeLeft = Math.max(0, Math.ceil(ALERT_THRESHOLD_SECONDS - idleSeconds));
-
-            if (idleSeconds > ALERT_THRESHOLD_SECONDS) {
-                isAlerting = true;
-                updateUI("alert");
-                timerDisplay.innerText = "⚠️ 请活动颈椎";
-                msgDisplay.innerText = "保持姿势过久";
-                statusIcon.innerText = "🚨";
-                playBeep();
+            // === 3. 综合状态处理 ===
+            
+            // 处理不良姿态计时
+            if (currentPostureStatus !== "OK") {
+                if (badPostureStartTime === 0) badPostureStartTime = now;
+                
+                const badDuration = (now - badPostureStartTime) / 1000;
+                
+                // 实时显示警告倒计时
+                overlayMsg.style.display = "block";
+                
+                if (badDuration > POSTURE_THRESHOLD_SECONDS) {
+                    isPostureAlerting = true;
+                    playBeep('urgent');
+                    
+                    // 报警状态
+                    overlayMsg.style.color = "#ff5555"; 
+                    overlayMsg.style.fontSize = "1.5rem";
+                    overlayMsg.innerText = currentPostureStatus === "LOW_HEAD" ? "⚠️ 别低头！皇冠会掉" : "⚠️ 脖子歪啦！";
+                    
+                    statusBar.className = "status-alert";
+                    msgDisplay.innerText = "不良姿态警告";
+                    statusIcon.innerText = "🦒";
+                } else {
+                    // 预警状态 (倒计时)
+                    overlayMsg.style.color = "#FFC107"; // 橙色预警
+                    overlayMsg.style.fontSize = "1.2rem";
+                    const typeText = currentPostureStatus === "LOW_HEAD" ? "低头" : "歪头";
+                    overlayMsg.innerText = `${typeText}警告: ${badDuration.toFixed(1)}s`;
+                }
             } else {
-                if (!isAlerting) {
+                badPostureStartTime = 0;
+                isPostureAlerting = false;
+                overlayMsg.style.display = "none";
+            }
+
+            // 处理久坐计时 (只有在姿态正常时才优先显示久坐状态，避免冲突)
+            if (!isPostureAlerting) {
+                const idleSeconds = (now - lastMoveTime) / 1000;
+                const timeLeft = Math.max(0, Math.ceil(ALERT_THRESHOLD_SECONDS - idleSeconds));
+
+                if (idleSeconds > ALERT_THRESHOLD_SECONDS) {
+                    isAlerting = true;
+                    updateUI("alert");
+                    timerDisplay.innerText = "⚠️ 该活动了";
+                    msgDisplay.innerText = "久坐提醒";
+                    playBeep('normal');
+                } else {
+                    // 正常倒计时
                     const m = Math.floor(timeLeft / 60);
                     const s = timeLeft % 60;
                     timerDisplay.innerText = `${m}:${s < 10 ? '0' + s : s}`;
+                    
+                    // 如果刚刚动过
+                    if (dist > MOVEMENT_THRESHOLD) updateUI("active");
+                    else updateUI("static");
                 }
             }
         }
@@ -257,24 +387,27 @@
     }
 
     function updateUI(state) {
+        if (isPostureAlerting) return; // 姿态报警优先级最高
+
         statusBar.className = "";
         if (state === "active") {
             statusBar.classList.add("status-ok");
-            msgDisplay.innerText = "状态活跃 (计时重置)";
+            msgDisplay.innerText = isCalibrated ? "监测中 (姿态良好)" : "监测中 (未校准)";
             statusIcon.innerText = "😊";
         } else if (state === "static") {
             if (!isAlerting) {
                 statusBar.classList.add("status-idle");
-                msgDisplay.innerText = "监测中...";
+                msgDisplay.innerText = isCalibrated ? "保持姿势..." : "等待校准...";
                 statusIcon.innerText = "⏱️";
             }
         } else if (state === "alert") {
             statusBar.classList.add("status-alert");
+            statusIcon.innerText = "🚨";
         }
     }
 
     async function startApp() {
-        updateSettings(); // 启动时读取一次配置
+        updateSettings(); 
         startBtn.disabled = true;
         startBtn.innerText = "正在启动...";
         
@@ -303,6 +436,7 @@
             
             await camera.start();
             startBtn.style.display = 'none'; 
+            calibBtn.style.display = 'block'; // 显示校准按钮
             
         } catch (error) {
             alert("启动失败: " + error.message);
