@@ -8,7 +8,7 @@
 
 无需安装，直接访问 GitHub Pages 即可使用：
 
-👉 **[点击开始守护颈椎](https://xingye1673.github.io/NeckGuard/NeckGuard/)**
+👉 **[点击开始守护颈椎](https://xingye1673.github.io/NeckGuard/)**
 
 *(注意：首次打开需要授予摄像头权限)*
 
