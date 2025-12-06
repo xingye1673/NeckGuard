@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>江男の颈椎守护者</title>
+    
+    <script src="js/pose.js"></script>
+    <script src="js/camera_utils.js"></script>
+    <script src="js/drawing_utils.js"></script>
+    
+    <style>
+        /* 全局样式：科技黑风格 */
+        body { margin: 0; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #111; color: #eee; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        
+        h2 { margin: 10px 0; font-size: 1.1rem; font-weight: 300; letter-spacing: 1px; color: #88c0d0; }
+
+        /* 视频容器 */
+        #container { 
+            position: relative; width: 95%; max-width: 480px; height: 55vh; 
+            background: #000; border-radius: 12px; overflow: hidden; 
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.1); 
+            border: 1px solid #333;
+        }
+        
+        video { position: absolute; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); opacity: 0.8; }
+        canvas { position: absolute; width: 100%; height: 100%; transform: scaleX(-1); }
+        
+        /* 状态显示区 */
+        #status-bar {
+            margin-top: 15px; width: 90%; max-width: 450px;
+            padding: 10px 15px; border-radius: 8px; background: #222; 
+            display: flex; justify-content: space-between; align-items: center;
+            border-left: 5px solid #444; transition: all 0.3s;
+        }
+        .status-ok { border-left-color: #4CAF50 !important; background: #1e2e1e; }
+        .status-idle { border-left-color: #FFC107 !important; background: #2e2a15; }
+        .status-alert { border-left-color: #F44336 !important; background: #2e1515; animation: pulse 1s infinite; }
+        
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(244, 67, 54, 0); } 100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); } }
+
+        .big-text { font-size: 1.4rem; font-weight: bold; font-variant-numeric: tabular-nums; }
+        .small-text { font-size: 0.8rem; color: #aaa; }
+
+        /* 控制面板 */
+        #controls {
+            margin-top: 15px; width: 90%; max-width: 450px;
+            background: #1a1a1a; padding: 15px; border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .control-group { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .control-group:last-child { margin-bottom: 0; }
+        
+        label { color: #bbb; }
+        
+        input[type="number"] {
+            background: #333; border: 1px solid #444; color: white; 
+            padding: 5px; width: 60px; text-align: center; border-radius: 4px;
+        }
+        
+        /* 滑动条样式 */
+        input[type="range"] { -webkit-appearance: none; width: 120px; height: 4px; background: #444; border-radius: 2px; outline: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; background: #88c0d0; border-radius: 50%; cursor: pointer; }
+
+        /* 启动按钮 */
+        #startBtn { 
+            margin: 20px; padding: 12px 40px; font-size: 16px; 
+            background: linear-gradient(45deg, #1976D2, #64B5F6); 
+            color: white; border: none; border-radius: 30px; 
+            box-shadow: 0 4px 10px rgba(25, 118, 210, 0.4);
+            cursor: pointer; letter-spacing: 1px;
+        }
+        #startBtn:active { transform: scale(0.95); }
+
+    </style>
+</head>
+<body>
+
+    <h2>江男の颈椎守护者</h2>
+    
+    <div id="container">
+        <video id="input_video" playsinline></video>
+        <canvas id="output_canvas"></canvas>
+    </div>
+
+    <!-- 状态条 -->
+    <div id="status-bar" class="status-ok">
+        <div>
+            <div id="timer-display" class="big-text">--:--</div>
+            <div id="msg-display" class="small-text">等待启动</div>
+        </div>
+        <div style="text-align: right;">
+            <div id="status-icon" style="font-size: 1.5rem;">💤</div>
+        </div>
+    </div>
+
+    <!-- 设置面板 -->
+    <div id="controls">
+        <div class="control-group">
+            <label>⏱️ 提醒时间 (分钟)</label>
+            <!-- 默认 20 分钟，步进 0.1 分钟（方便测试，输入 0.2 就是 12秒） -->
+            <input type="number" id="timeInput" value="20" step="0.1" min="0.1" onchange="updateSettings()">
+        </div>
+        <div class="control-group">
+            <label>🌊 灵敏度 (越小越灵)</label>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <input type="range" id="senseInput" min="0.01" max="0.15" step="0.01" value="0.05" oninput="updateSettings()">
+                <span id="senseValue" style="color:#888; font-size:0.8rem; width:30px;">0.05</span>
+            </div>
+        </div>
+        <div style="margin-top:5px; font-size:0.75rem; color:#666;">
+            * 测试技巧：将时间设为 0.2 (即12秒) 即可快速预览效果
+        </div>
+    </div>
+    
+    <button id="startBtn" onclick="startApp()">启动摄像头</button>
+
+    <div style="margin-top: 20px; font-size: 0.8rem; opacity: 0.6;">
+        <a href="https://github.com/xingye1673/NeckGuard" target="_blank" style="color: #88c0d0; text-decoration: none; border-bottom: 1px dashed #88c0d0;">
+            View on GitHub
+        </a>
+    </div>
+
+<script>
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const statusBar = document.getElementById('status-bar');
+    const timerDisplay = document.getElementById('timer-display');
+    const msgDisplay = document.getElementById('msg-display');
+    const statusIcon = document.getElementById('status-icon');
+    const startBtn = document.getElementById('startBtn');
+    
+    // 输入控件
+    const timeInput = document.getElementById('timeInput');
+    const senseInput = document.getElementById('senseInput');
+    const senseValue = document.getElementById('senseValue');
+
+    // 动态配置变量
+    let ALERT_THRESHOLD_SECONDS = 20 * 60; // 默认20分钟
+    let MOVEMENT_THRESHOLD = 0.05;
+
+    let lastMoveTime = Date.now();
+    let prevNose = null;
+    let isAlerting = false;
+    let camera = null;
+    let pose = null;
+    let audioCtx = null;
+    let nextBeepTime = 0;
+
+    // 更新设置
+    function updateSettings() {
+        // 读取分钟转为秒
+        let mins = parseFloat(timeInput.value);
+        if(mins <= 0) mins = 0.1;
+        ALERT_THRESHOLD_SECONDS = mins * 60;
+        
+        // 读取灵敏度
+        MOVEMENT_THRESHOLD = parseFloat(senseInput.value);
+        senseValue.innerText = MOVEMENT_THRESHOLD;
+        
+        // 如果正在运行，不重置计时，只改变阈值
+        console.log(`Settings Updated: Alert=${ALERT_THRESHOLD_SECONDS}s, Sense=${MOVEMENT_THRESHOLD}`);
+    }
+
+    // 蜂鸣器逻辑
+    function playBeep() {
+        const now = Date.now();
+        if (now < nextBeepTime) return;
+        nextBeepTime = now + 1000; 
+
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.type = 'square'; 
+        oscillator.frequency.value = 600; // 稍微低沉一点的提示音
+        
+        gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.2); 
+    }
+
+    function onResults(results) {
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        
+        if (results.poseLandmarks) {
+            // === 美化后的绘制逻辑 ===
+            // 1. 绘制极细的连线 (青色, 1px)
+            drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
+                         {color: 'rgba(0, 255, 255, 0.6)', lineWidth: 1});
+            
+            // 2. 绘制极小的关键点 (白色, 半径1px)
+            // 并不是所有33个点都画，只画上半身关键点会更清爽，这里简单起见还是画全部，但缩小
+            drawLandmarks(canvasCtx, results.poseLandmarks,
+                        {color: 'rgba(255, 255, 255, 0.8)', lineWidth: 0, radius: 1});
+            
+            // 特别标记鼻子 (用来提示监测点)
+            const nose = results.poseLandmarks[0];
+            canvasCtx.beginPath();
+            canvasCtx.arc(nose.x * canvasElement.width, nose.y * canvasElement.height, 3, 0, 2 * Math.PI);
+            canvasCtx.fillStyle = '#00FFFF';
+            canvasCtx.fill();
+        }
+
+        // 逻辑判断
+        if (results.poseLandmarks) {
+            const nose = results.poseLandmarks[0];
+            const now = Date.now();
+
+            if (!prevNose) {
+                prevNose = nose;
+                lastMoveTime = now;
+            }
+
+            const dist = Math.sqrt(Math.pow(nose.x - prevNose.x, 2) + Math.pow(nose.y - prevNose.y, 2));
+
+            // 使用动态读取的灵敏度
+            if (dist > MOVEMENT_THRESHOLD) {
+                lastMoveTime = now;
+                prevNose = nose;
+                isAlerting = false;
+                updateUI("active");
+            } else {
+                updateUI("static");
+            }
+
+            const idleSeconds = (now - lastMoveTime) / 1000;
+            // 使用动态读取的时间阈值
+            const timeLeft = Math.max(0, Math.ceil(ALERT_THRESHOLD_SECONDS - idleSeconds));
+
+            if (idleSeconds > ALERT_THRESHOLD_SECONDS) {
+                isAlerting = true;
+                updateUI("alert");
+                timerDisplay.innerText = "⚠️ 请活动颈椎";
+                msgDisplay.innerText = "保持姿势过久";
+                statusIcon.innerText = "🚨";
+                playBeep();
+            } else {
+                if (!isAlerting) {
+                    const m = Math.floor(timeLeft / 60);
+                    const s = timeLeft % 60;
+                    timerDisplay.innerText = `${m}:${s < 10 ? '0' + s : s}`;
+                }
+            }
+        }
+        canvasCtx.restore();
+    }
+
+    function updateUI(state) {
+        statusBar.className = "";
+        if (state === "active") {
+            statusBar.classList.add("status-ok");
+            msgDisplay.innerText = "状态活跃 (计时重置)";
+            statusIcon.innerText = "😊";
+        } else if (state === "static") {
+            if (!isAlerting) {
+                statusBar.classList.add("status-idle");
+                msgDisplay.innerText = "监测中...";
+                statusIcon.innerText = "⏱️";
+            }
+        } else if (state === "alert") {
+            statusBar.classList.add("status-alert");
+        }
+    }
+
+    async function startApp() {
+        updateSettings(); // 启动时读取一次配置
+        startBtn.disabled = true;
+        startBtn.innerText = "正在启动...";
+        
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        try {
+            pose = new Pose({
+                locateFile: (file) => `js/${file}`
+            });
+            
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            pose.onResults(onResults);
+
+            camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    await pose.send({image: videoElement});
+                },
+                width: 640,
+                height: 480
+            });
+            
+            await camera.start();
+            startBtn.style.display = 'none'; 
+            
+        } catch (error) {
+            alert("启动失败: " + error.message);
+            startBtn.disabled = false;
+            startBtn.innerText = "重试";
+        }
+    }
+</script>
+</body>
+</html>
