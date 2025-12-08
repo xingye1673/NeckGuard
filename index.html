@@ -450,8 +450,9 @@
 
             camera = new Camera(videoElement, {
                 onFrame: async () => {
-                    // iOS Safari 优化：页面不可见或视频未准备好时不处理，防止卡死
-                    if (!document.hidden && videoElement.readyState >= 2) {
+                    // 仅在页面可见时处理，节省资源并防止 iOS 后台崩溃
+                    // 移除 readyState 判断，因为 Camera 库已保证流的有效性
+                    if (!document.hidden) {
                         await pose.send({image: videoElement});
                     }
                 },
