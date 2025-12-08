@@ -450,11 +450,7 @@
 
             camera = new Camera(videoElement, {
                 onFrame: async () => {
-                    // 仅在页面可见时处理，节省资源并防止 iOS 后台崩溃
-                    // 移除 readyState 判断，因为 Camera 库已保证流的有效性
-                    if (!document.hidden) {
-                        await pose.send({image: videoElement});
-                    }
+                    await pose.send({image: videoElement});
                 },
                 width: 640,
                 height: 480
