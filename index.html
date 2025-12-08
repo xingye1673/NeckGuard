@@ -33,16 +33,6 @@
             pointer-events: none; display: none;
         }
 
-        /* iOS 风格 Toast 提示 */
-        #toast {
-            visibility: hidden; min-width: 200px; background-color: rgba(50, 50, 50, 0.95);
-            color: #fff; text-align: center; border-radius: 50px; padding: 12px 24px;
-            position: fixed; z-index: 100; left: 50%; bottom: 80px; transform: translateX(-50%);
-            font-size: 0.95rem; box-shadow: 0 4px 15px rgba(0,0,0,0.4); border: 1px solid #444;
-            opacity: 0; transition: opacity 0.3s, bottom 0.3s; pointer-events: none;
-        }
-        #toast.show { visibility: visible; opacity: 1; bottom: 100px; }
-
         /* 状态显示区 */
         #status-bar {
             margin-top: 10px; width: 90%; max-width: 450px;
@@ -105,9 +95,6 @@
         <canvas id="output_canvas"></canvas>
         <div id="overlay-msg"></div>
     </div>
-    
-    <!-- 全局 Toast 提示 -->
-    <div id="toast"></div>
 
     <!-- 状态条 -->
     <div id="status-bar" class="status-ok">
@@ -180,7 +167,6 @@
     const startBtn = document.getElementById('startBtn');
     const calibBtn = document.getElementById('calibBtn');
     const overlayMsg = document.getElementById('overlay-msg');
-    const toast = document.getElementById('toast');
     
     // 输入控件
     const timeInput = document.getElementById('timeInput');
@@ -241,18 +227,10 @@
         console.log(`Settings: Sedentary=${ALERT_THRESHOLD_SECONDS}s, Posture=${POSTURE_THRESHOLD_SECONDS}s, Sense=${MOVEMENT_THRESHOLD}, LowHead=${LOW_HEAD_THRESHOLD}, Tilt=${TILT_THRESHOLD}`);
     }
 
-    // 显示 Toast 提示 (替代 alert)
-    function showToast(msg) {
-        toast.innerText = msg;
-        toast.className = "show";
-        // 3秒后自动消失
-        setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
-    }
-
     // 校准功能
     function calibrate() {
         if (!prevNose) {
-            showToast("⚠️ 未检测到人脸，请正对摄像头");
+            alert("未检测到人脸，请正对摄像头");
             return;
         }
         // 简单的校准：记录当前鼻子的Y坐标（归一化 0-1，越往下越大）
@@ -261,7 +239,7 @@
         standardPose.eyeAngle = prevNose.angle || 0; // 这里简化，实际在onResults里算
         
         isCalibrated = true;
-        showToast("✅ 校准成功！已记录标准坐姿");
+        alert("✅ 校准成功！\n系统已记住您的标准坐姿。\n\n现在尝试低头或歪头，系统将进行监测。");
         calibBtn.innerText = "🎯 重新校准";
     }
 
@@ -459,16 +437,6 @@
             await camera.start();
             startBtn.style.display = 'none'; 
             calibBtn.style.display = 'block'; // 显示校准按钮
-
-            // iOS Safari 后台切换优化
-            document.addEventListener("visibilitychange", () => {
-                if (!document.hidden) {
-                    // 回到前台时，确保视频继续播放
-                    if (videoElement.paused) {
-                        videoElement.play().catch(e => console.log("Resume video failed", e));
-                    }
-                }
-            });
             
         } catch (error) {
             alert("启动失败: " + error.message);
